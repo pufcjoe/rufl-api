@@ -304,7 +304,7 @@ client.on('interactionCreate', async interaction => {
       .from('players')
       .select('*')
       .eq('userid', userid)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return interaction.reply({ content: `Player ${username || userid} not found in database.`, ephemeral: true });
@@ -350,7 +350,7 @@ client.on('interactionCreate', async interaction => {
       .update({ team, division })
       .eq('userid', userid)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
@@ -376,7 +376,7 @@ client.on('interactionCreate', async interaction => {
       .update({ division })
       .eq('userid', userid)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
@@ -402,7 +402,7 @@ client.on('interactionCreate', async interaction => {
       .update({ rating })
       .eq('userid', userid)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
@@ -428,7 +428,7 @@ client.on('interactionCreate', async interaction => {
       .update({ suspension: suspended })
       .eq('userid', userid)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
@@ -454,7 +454,7 @@ client.on('interactionCreate', async interaction => {
       .update({ hof: position })
       .eq('userid', userid)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
@@ -480,7 +480,7 @@ client.on('interactionCreate', async interaction => {
       .update({ management: role })
       .eq('userid', userid)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
@@ -506,7 +506,7 @@ client.on('interactionCreate', async interaction => {
       .update({ nationalteam })
       .eq('userid', userid)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
@@ -555,7 +555,7 @@ client.on('interactionCreate', async interaction => {
       .update({ secondcareer: isalt })
       .eq('userid', userid)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
@@ -591,7 +591,7 @@ app.get('/player/:userid', async (req, res) => {
     .from('players')
     .select('*')
     .eq('userid', req.params.userid)
-    .single();
+    .maybeSingle();
 
   if (error || !data) {
     return res.status(404).json({ success: false, error: 'Player not found' });
@@ -621,7 +621,7 @@ app.post('/player', async (req, res) => {
     .from('players')
     .insert(req.body)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     return res.status(400).json({ success: false, error: error.message });
@@ -652,7 +652,7 @@ app.patch('/player/:userid', async (req, res) => {
     .update(req.body)
     .eq('userid', req.params.userid)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     return res.status(400).json({ success: false, error: error.message });
