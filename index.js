@@ -3,6 +3,22 @@ const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuild
 const { createClient } = require('@supabase/supabase-js');
 const express = require('express');
 
+// ============ VALID TEAMS AND DIVISIONS ============
+const VALID_TEAMS = {
+  'A': ['Seattle Sea', 'Black Panthers', 'Phantom Town', 'Tix City', 'The Kingdom', 'Red Bandits'],
+  'B': ['White Wolves', 'Eagles', 'Galaxy United', 'Spartans']
+};
+
+const ALL_TEAMS = [...VALID_TEAMS['A'], ...VALID_TEAMS['B'], 'FreeAgent'];
+const VALID_DIVISIONS = ['A', 'B', 'None'];
+
+function getTeamDivision(teamName) {
+  if (teamName === 'FreeAgent') return 'None';
+  if (VALID_TEAMS['A'].includes(teamName)) return 'A';
+  if (VALID_TEAMS['B'].includes(teamName)) return 'B';
+  return null;
+}
+
 // ============ SUPABASE SETUP ============
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -40,6 +56,19 @@ const commands = [
       option.setName('team')
         .setDescription('The team name')
         .setRequired(true)
+        .addChoices(
+          { name: 'Free Agent', value: 'FreeAgent' },
+          { name: 'Seattle Sea', value: 'Seattle Sea' },
+          { name: 'Black Panthers', value: 'Black Panthers' },
+          { name: 'Phantom Town', value: 'Phantom Town' },
+          { name: 'Tix City', value: 'Tix City' },
+          { name: 'The Kingdom', value: 'The Kingdom' },
+          { name: 'Red Bandits', value: 'Red Bandits' },
+          { name: 'White Wolves', value: 'White Wolves' },
+          { name: 'Eagles', value: 'Eagles' },
+          { name: 'Galaxy United', value: 'Galaxy United' },
+          { name: 'Spartans', value: 'Spartans' }
+        )
     ),
   new SlashCommandBuilder()
     .setName('setdivision')
@@ -51,8 +80,13 @@ const commands = [
     )
     .addStringOption(option =>
       option.setName('division')
-        .setDescription('The division (e.g., A, B, C)')
+        .setDescription('The division')
         .setRequired(true)
+        .addChoices(
+          { name: 'Division A', value: 'A' },
+          { name: 'Division B', value: 'B' },
+          { name: 'None', value: 'None' }
+        )
     ),
   new SlashCommandBuilder()
     .setName('setrating')
@@ -140,6 +174,22 @@ const commands = [
         .setDescription('The Roblox UserId')
         .setRequired(true)
     ),
+  new SlashCommandBuilder()
+    .setName('teams')
+    .setDescription('List all valid teams and divisions'),
+  new SlashCommandBuilder()
+    .setName('setalt')
+    .setDescription('Set a player\'s alt/second career status')
+    .addStringOption(option =>
+      option.setName('userid')
+        .setDescription('The Roblox UserId')
+        .setRequired(true)
+    )
+    .addBooleanOption(option =>
+      option.setName('isalt')
+        .setDescription('True if this is an alt/second career account')
+        .setRequired(true)
+    ),
 ].map(command => command.toJSON());
 
 // Register commands when bot is ready
@@ -165,6 +215,20 @@ client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
   const { commandName } = interaction;
+
+  // /teams command
+  if (commandName === 'teams') {
+    const embed = new EmbedBuilder()
+      .setTitle('Valid Teams')
+      .setColor(0x00ff00)
+      .addFields(
+        { name: 'Division A', value: VALID_TEAMS['A'].join('\n'), inline: true },
+        { name: 'Division B', value: VALID_TEAMS['B'].join('\n'), inline: true }
+      )
+      .setTimestamp();
+
+    return interaction.reply({ embeds: [embed] });
+  }
 
   // /lookup command
   if (commandName === 'lookup') {
@@ -205,10 +269,11 @@ client.on('interactionCreate', async interaction => {
   if (commandName === 'setteam') {
     const userid = interaction.options.getString('userid');
     const team = interaction.options.getString('team');
+    const division = getTeamDivision(team);
 
     const { data, error } = await supabase
       .from('players')
-      .update({ team })
+      .update({ team, division })
       .eq('userid', userid)
       .select()
       .single();
@@ -217,7 +282,7 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
     }
 
-    return interaction.reply({ content: `Updated ${userid}'s team to **${team}**` });
+    return interaction.reply({ content: `Updated ${userid}'s team to **${team}** (Division ${division})` });
   }
 
   // /setdivision command
@@ -349,6 +414,25 @@ client.on('interactionCreate', async interaction => {
 
     return interaction.reply({ content: `Deleted player ${userid} from the database.` });
   }
+
+  // /setalt command
+  if (commandName === 'setalt') {
+    const userid = interaction.options.getString('userid');
+    const isalt = interaction.options.getBoolean('isalt');
+
+    const { data, error } = await supabase
+      .from('players')
+      .update({ secondcareer: isalt })
+      .eq('userid', userid)
+      .select()
+      .single();
+
+    if (error || !data) {
+      return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
+    }
+
+    return interaction.reply({ content: `Updated ${userid}'s alt/second career status to **${isalt ? 'Yes' : 'No'}**` });
+  }
 });
 
 client.login(process.env.DISCORD_TOKEN);
@@ -360,6 +444,15 @@ app.use(express.json());
 // Health check
 app.get('/', (req, res) => {
   res.json({ status: 'API is running' });
+});
+
+// Get valid teams
+app.get('/teams', (req, res) => {
+  res.json({ 
+    success: true, 
+    divisions: VALID_TEAMS,
+    allTeams: ALL_TEAMS
+  });
 });
 
 // Get player
@@ -378,6 +471,24 @@ app.get('/player/:userid', async (req, res) => {
 
 // Create player
 app.post('/player', async (req, res) => {
+  // Validate team if provided
+  if (req.body.team && !ALL_TEAMS.includes(req.body.team)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Invalid team name. Only official team names can be used.',
+      validTeams: ALL_TEAMS
+    });
+  }
+
+  // Validate division if provided
+  if (req.body.division && !VALID_DIVISIONS.includes(req.body.division)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Invalid division. Only official divisions can be used.',
+      validDivisions: VALID_DIVISIONS
+    });
+  }
+
   const { data, error } = await supabase
     .from('players')
     .insert(req.body)
@@ -392,6 +503,24 @@ app.post('/player', async (req, res) => {
 
 // Update player
 app.patch('/player/:userid', async (req, res) => {
+  // Validate team if provided
+  if (req.body.team && !ALL_TEAMS.includes(req.body.team)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Invalid team name. Only official team names can be used.',
+      validTeams: ALL_TEAMS
+    });
+  }
+
+  // Validate division if provided
+  if (req.body.division && !VALID_DIVISIONS.includes(req.body.division)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Invalid division. Only official divisions can be used.',
+      validDivisions: VALID_DIVISIONS
+    });
+  }
+
   const { data, error } = await supabase
     .from('players')
     .update(req.body)
