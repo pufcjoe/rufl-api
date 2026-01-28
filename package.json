@@ -13,20 +13,3 @@
     "dotenv": "^16.3.1"
   }
 }
-```
-
----
-
-**.env.example** (this goes on GitHub to show what variables are needed):
-```
-DISCORD_TOKEN=your_discord_bot_token_here
-SUPABASE_URL=your_supabase_url_here
-SUPABASE_KEY=your_supabase_service_role_key_here
-```
-
----
-
-**.gitignore** (prevents secrets from being uploaded):
-```
-node_modules
-.env
