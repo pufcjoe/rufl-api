@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 const express = require('express');
 
@@ -25,6 +25,50 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
+// ============ ROBLOX API HELPER ============
+async function resolveUserId(input) {
+  if (/^\d+$/.test(input)) {
+    return input;
+  }
+  
+  try {
+    const response = await fetch('https://users.roblox.com/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [input], excludeBannedUsers: false })
+    });
+    const data = await response.json();
+    if (data.data && data.data.length > 0) {
+      return String(data.data[0].id);
+    }
+    return null;
+  } catch (error) {
+    console.error('Roblox API error:', error);
+    return null;
+  }
+}
+
+async function getUsernameFromId(userid) {
+  try {
+    const response = await fetch(`https://users.roblox.com/v1/users/${userid}`);
+    const data = await response.json();
+    return data.name || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function updateUsername(userid) {
+  const username = await getUsernameFromId(userid);
+  if (username) {
+    await supabase
+      .from('players')
+      .update({ username })
+      .eq('userid', userid);
+  }
+  return username;
+}
+
 // ============ DISCORD BOT SETUP ============
 const client = new Client({
   intents: [
@@ -38,18 +82,18 @@ const client = new Client({
 const commands = [
   new SlashCommandBuilder()
     .setName('lookup')
-    .setDescription('Look up a player by their Roblox UserId')
+    .setDescription('Look up a player by their Roblox UserId or Username')
     .addStringOption(option =>
-      option.setName('userid')
-        .setDescription('The Roblox UserId')
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
         .setRequired(true)
     ),
   new SlashCommandBuilder()
     .setName('setteam')
     .setDescription('Set a player\'s team')
     .addStringOption(option =>
-      option.setName('userid')
-        .setDescription('The Roblox UserId')
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
         .setRequired(true)
     )
     .addStringOption(option =>
@@ -74,8 +118,8 @@ const commands = [
     .setName('setdivision')
     .setDescription('Set a player\'s division')
     .addStringOption(option =>
-      option.setName('userid')
-        .setDescription('The Roblox UserId')
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
         .setRequired(true)
     )
     .addStringOption(option =>
@@ -92,8 +136,8 @@ const commands = [
     .setName('setrating')
     .setDescription('Set a player\'s rating')
     .addStringOption(option =>
-      option.setName('userid')
-        .setDescription('The Roblox UserId')
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
         .setRequired(true)
     )
     .addIntegerOption(option =>
@@ -105,8 +149,8 @@ const commands = [
     .setName('suspend')
     .setDescription('Suspend or unsuspend a player')
     .addStringOption(option =>
-      option.setName('userid')
-        .setDescription('The Roblox UserId')
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
         .setRequired(true)
     )
     .addBooleanOption(option =>
@@ -118,8 +162,8 @@ const commands = [
     .setName('sethof')
     .setDescription('Set a player\'s Hall of Fame position')
     .addStringOption(option =>
-      option.setName('userid')
-        .setDescription('The Roblox UserId')
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
         .setRequired(true)
     )
     .addStringOption(option =>
@@ -138,8 +182,8 @@ const commands = [
     .setName('setmanagement')
     .setDescription('Set a player\'s management role')
     .addStringOption(option =>
-      option.setName('userid')
-        .setDescription('The Roblox UserId')
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
         .setRequired(true)
     )
     .addStringOption(option =>
@@ -157,8 +201,8 @@ const commands = [
     .setName('setnationalteam')
     .setDescription('Set a player\'s national team')
     .addStringOption(option =>
-      option.setName('userid')
-        .setDescription('The Roblox UserId')
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
         .setRequired(true)
     )
     .addStringOption(option =>
@@ -170,8 +214,8 @@ const commands = [
     .setName('deleteplayer')
     .setDescription('Delete a player from the database')
     .addStringOption(option =>
-      option.setName('userid')
-        .setDescription('The Roblox UserId')
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
         .setRequired(true)
     ),
   new SlashCommandBuilder()
@@ -181,8 +225,8 @@ const commands = [
     .setName('setalt')
     .setDescription('Set a player\'s alt/second career status')
     .addStringOption(option =>
-      option.setName('userid')
-        .setDescription('The Roblox UserId')
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
         .setRequired(true)
     )
     .addBooleanOption(option =>
@@ -216,6 +260,21 @@ client.on('interactionCreate', async interaction => {
 
   const { commandName } = interaction;
 
+  // Permission check - only admins and specific role can use commands
+  const ALLOWED_ROLE_ID = '1466150846101196870';
+  const member = interaction.member;
+  
+  const hasPermission = 
+    member.permissions.has(PermissionFlagsBits.Administrator) || 
+    member.roles.cache.has(ALLOWED_ROLE_ID);
+  
+  if (!hasPermission) {
+    return interaction.reply({ 
+      content: 'You do not have permission to use this command.', 
+      ephemeral: true 
+    });
+  }
+
   // /teams command
   if (commandName === 'teams') {
     const embed = new EmbedBuilder()
@@ -232,7 +291,14 @@ client.on('interactionCreate', async interaction => {
 
   // /lookup command
   if (commandName === 'lookup') {
-    const userid = interaction.options.getString('userid');
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+      return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const username = await updateUsername(userid);
     
     const { data, error } = await supabase
       .from('players')
@@ -241,11 +307,12 @@ client.on('interactionCreate', async interaction => {
       .single();
 
     if (error || !data) {
-      return interaction.reply({ content: `Player with UserId ${userid} not found.`, ephemeral: true });
+      return interaction.reply({ content: `Player ${username || userid} not found in database.`, ephemeral: true });
     }
 
     const embed = new EmbedBuilder()
-      .setTitle(`Player: ${userid}`)
+      .setTitle(`Player: ${username || data.username || userid}`)
+      .setDescription(`User ID: ${userid}`)
       .setColor(0x00ff00)
       .addFields(
         { name: 'Team', value: data.team || 'None', inline: true },
@@ -267,7 +334,14 @@ client.on('interactionCreate', async interaction => {
 
   // /setteam command
   if (commandName === 'setteam') {
-    const userid = interaction.options.getString('userid');
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+      return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const username = await updateUsername(userid);
     const team = interaction.options.getString('team');
     const division = getTeamDivision(team);
 
@@ -282,12 +356,19 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
     }
 
-    return interaction.reply({ content: `Updated ${userid}'s team to **${team}** (Division ${division})` });
+    return interaction.reply({ content: `Updated ${username || userid}'s team to **${team}** (Division ${division})` });
   }
 
   // /setdivision command
   if (commandName === 'setdivision') {
-    const userid = interaction.options.getString('userid');
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+      return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const username = await updateUsername(userid);
     const division = interaction.options.getString('division');
 
     const { data, error } = await supabase
@@ -301,12 +382,19 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
     }
 
-    return interaction.reply({ content: `Updated ${userid}'s division to **${division}**` });
+    return interaction.reply({ content: `Updated ${username || userid}'s division to **${division}**` });
   }
 
   // /setrating command
   if (commandName === 'setrating') {
-    const userid = interaction.options.getString('userid');
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+      return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const username = await updateUsername(userid);
     const rating = interaction.options.getInteger('rating');
 
     const { data, error } = await supabase
@@ -320,12 +408,19 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
     }
 
-    return interaction.reply({ content: `Updated ${userid}'s rating to **${rating}**` });
+    return interaction.reply({ content: `Updated ${username || userid}'s rating to **${rating}**` });
   }
 
   // /suspend command
   if (commandName === 'suspend') {
-    const userid = interaction.options.getString('userid');
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+      return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const username = await updateUsername(userid);
     const suspended = interaction.options.getBoolean('suspended');
 
     const { data, error } = await supabase
@@ -339,12 +434,19 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
     }
 
-    return interaction.reply({ content: `${userid} has been **${suspended ? 'suspended' : 'unsuspended'}**` });
+    return interaction.reply({ content: `${username || userid} has been **${suspended ? 'suspended' : 'unsuspended'}**` });
   }
 
   // /sethof command
   if (commandName === 'sethof') {
-    const userid = interaction.options.getString('userid');
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+      return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const username = await updateUsername(userid);
     const position = interaction.options.getString('position');
 
     const { data, error } = await supabase
@@ -358,12 +460,19 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
     }
 
-    return interaction.reply({ content: `Updated ${userid}'s Hall of Fame status to **${position}**` });
+    return interaction.reply({ content: `Updated ${username || userid}'s Hall of Fame status to **${position}**` });
   }
 
   // /setmanagement command
   if (commandName === 'setmanagement') {
-    const userid = interaction.options.getString('userid');
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+      return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const username = await updateUsername(userid);
     const role = interaction.options.getString('role');
 
     const { data, error } = await supabase
@@ -377,12 +486,19 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
     }
 
-    return interaction.reply({ content: `Updated ${userid}'s management role to **${role}**` });
+    return interaction.reply({ content: `Updated ${username || userid}'s management role to **${role}**` });
   }
 
   // /setnationalteam command
   if (commandName === 'setnationalteam') {
-    const userid = interaction.options.getString('userid');
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+      return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const username = await updateUsername(userid);
     const nationalteam = interaction.options.getString('nationalteam');
 
     const { data, error } = await supabase
@@ -396,12 +512,19 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
     }
 
-    return interaction.reply({ content: `Updated ${userid}'s national team to **${nationalteam}**` });
+    return interaction.reply({ content: `Updated ${username || userid}'s national team to **${nationalteam}**` });
   }
 
   // /deleteplayer command
   if (commandName === 'deleteplayer') {
-    const userid = interaction.options.getString('userid');
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+      return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const username = await getUsernameFromId(userid);
 
     const { error } = await supabase
       .from('players')
@@ -412,12 +535,19 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `Failed to delete player.`, ephemeral: true });
     }
 
-    return interaction.reply({ content: `Deleted player ${userid} from the database.` });
+    return interaction.reply({ content: `Deleted ${username || userid} from the database.` });
   }
 
   // /setalt command
   if (commandName === 'setalt') {
-    const userid = interaction.options.getString('userid');
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+      return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const username = await updateUsername(userid);
     const isalt = interaction.options.getBoolean('isalt');
 
     const { data, error } = await supabase
@@ -431,7 +561,7 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
     }
 
-    return interaction.reply({ content: `Updated ${userid}'s alt/second career status to **${isalt ? 'Yes' : 'No'}**` });
+    return interaction.reply({ content: `Updated ${username || userid}'s alt/second career status to **${isalt ? 'Yes' : 'No'}**` });
   }
 });
 
@@ -471,7 +601,6 @@ app.get('/player/:userid', async (req, res) => {
 
 // Create player
 app.post('/player', async (req, res) => {
-  // Validate team if provided
   if (req.body.team && !ALL_TEAMS.includes(req.body.team)) {
     return res.status(400).json({ 
       success: false, 
@@ -480,7 +609,6 @@ app.post('/player', async (req, res) => {
     });
   }
 
-  // Validate division if provided
   if (req.body.division && !VALID_DIVISIONS.includes(req.body.division)) {
     return res.status(400).json({ 
       success: false, 
@@ -503,7 +631,6 @@ app.post('/player', async (req, res) => {
 
 // Update player
 app.patch('/player/:userid', async (req, res) => {
-  // Validate team if provided
   if (req.body.team && !ALL_TEAMS.includes(req.body.team)) {
     return res.status(400).json({ 
       success: false, 
@@ -512,7 +639,6 @@ app.patch('/player/:userid', async (req, res) => {
     });
   }
 
-  // Validate division if provided
   if (req.body.division && !VALID_DIVISIONS.includes(req.body.division)) {
     return res.status(400).json({ 
       success: false, 
