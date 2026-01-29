@@ -1048,7 +1048,7 @@ client.on('interactionCreate', async interaction => {
 
       return interaction.reply({
         content: `✅ Dropped **${username}** from your team.\n💰 Refunded: **£${refundAmount}m** | New budget: **£${newBudget.toFixed(1)}m**`
-          });
+      });
 
     ///fantasy captain
     if (subcommand === 'captain') {
