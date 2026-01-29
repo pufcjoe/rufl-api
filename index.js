@@ -975,7 +975,7 @@ client.on('interactionCreate', async interaction => {
           fantasy_team_id: team.id,
           player_userid: parseInt(userid),
           position: position,
-          is_captain: false
+          is_captain: false,
           purchase_price: playerPrice
         });
 
