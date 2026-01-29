@@ -976,6 +976,7 @@ client.on('interactionCreate', async interaction => {
           player_userid: parseInt(userid),
           position: position,
           is_captain: false
+          purchase_price: playerPrice
         });
 
       if (error) {
