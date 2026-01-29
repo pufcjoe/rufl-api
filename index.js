@@ -1046,8 +1046,9 @@ client.on('interactionCreate', async interaction => {
         .update({ budget: newBudget })
         .eq('id', team.id);
 
-      return interaction.reply({ content: `✅ Dropped **${username}** from your team.\n💰 Refunded: **£${refundAmount}m** | New budget: **£${newBudget.toFixed(1)}m**`
-});
+      return interaction.reply({
+        content: `✅ Dropped **${username}** from your team.\n💰 Refunded: **£${refundAmount}m** | New budget: **£${newBudget.toFixed(1)}m**`
+          });
 
     ///fantasy captain
     if (subcommand === 'captain') {
