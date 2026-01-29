@@ -1016,15 +1016,6 @@ client.on('interactionCreate', async interaction => {
 
       const username = await getUsernameFromId(userid);
 
-      // Get player price for refund
-      const refundAmount = selection.purchase_price || 0;
-
-      const newBudget = (team.budget || 0) + refundAmount;
-      await supabase
-        .from('fantasy_teams')
-        .update({ budget: newBudget })
-        .eq('id', team.id);
-
       // Check if player is in team
       const { data: selection } = await supabase
         .from('fantasy_selections')
@@ -1037,35 +1028,32 @@ client.on('interactionCreate', async interaction => {
         return interaction.reply({ content: `${username} is not in your team.`, ephemeral: true });
       }
 
+      const refundAmount = selection.purchase_price;
+
       const { error } = await supabase
         .from('fantasy_selections')
         .delete()
-        .eq('fantasy_team_id', team.id)
-        .eq('player_userid', parseInt(userid));
+        .eq('id', selection.id);
+
+      if (!selection) {
+        return interaction.reply({ content: `${username} is not in your team.`, ephemeral: true });
+      }
+
+      const newBudget = (team.budget || 0) + refundAmount;
 
       if (error) {
         return interaction.reply({ content: `Failed to drop player.`, ephemeral: true });
       }
-
-      // Refund budget
-      const refundAmount = selection.purchase_price;
-      const newBudget = (team.budget || 0) + refundAmount;
       
       await supabase
         .from('fantasy_teams')
         .update({ budget: newBudget })
         .eq('id', team.id);
 
-      await supabase
-        .from('fantasy_selections')
-        .delete()
-        .eq('fantasy_team_id', team.id)
-        .eq('player_userid', parseInt(userid));
+      return interaction.reply({ content: `✅ Dropped **${username}** from your team.\n💰 Refunded: **£${refundAmount}m** | New budget: **£${newBudget.toFixed(1)}m**`
+});
 
-      return interaction.reply({ content: `✅ Dropped **${username}** from your team.\n💰 Refunded: **£${refundAmount}m** | New budget: **£${newBudget.toFixed(1)}m**});
-    }
-
-    // /fantasy captain
+    ///fantasy captain
     if (subcommand === 'captain') {
       const discordId = interaction.user.id;
       const playerInput = interaction.options.getString('player');
