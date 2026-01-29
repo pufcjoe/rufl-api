@@ -1028,22 +1028,18 @@ client.on('interactionCreate', async interaction => {
         return interaction.reply({ content: `${username} is not in your team.`, ephemeral: true });
       }
 
-      const refundAmount = selection.purchase_price;
+      const refundAmount = selection.purchase_price ?? 0;
 
       const { error } = await supabase
         .from('fantasy_selections')
         .delete()
         .eq('id', selection.id);
 
-      if (!selection) {
-        return interaction.reply({ content: `${username} is not in your team.`, ephemeral: true });
-      }
-
-      const newBudget = (team.budget || 0) + refundAmount;
-
       if (error) {
         return interaction.reply({ content: `Failed to drop player.`, ephemeral: true });
       }
+
+      const newBudget = (team.budget || 0) + refundAmount;
       
       await supabase
         .from('fantasy_teams')
