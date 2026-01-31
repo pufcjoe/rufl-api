@@ -543,6 +543,28 @@ client.on('interactionCreate', async interaction => {
     return interaction.reply({ embeds: [embed] });
   }
 
+  // /goals commmand
+  if (commandName === 'goals') {
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+        return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const { data, error } = await supabase
+      .from('players')
+      .select('goals, username')
+      .eq('userid', userid)
+      .maybeSingle();
+
+    if (error || !data) {
+      return interaction.reply({ content: `Player not found in database.`, ephemeral: true });
+    }
+
+    return interaction.reply({ content: `⚽ **${data.username}** has scored **${data.goals || 0}** goals!` });
+}
+  
   // /lookup command
   if (commandName === 'lookup') {
     const input = interaction.options.getString('player');
