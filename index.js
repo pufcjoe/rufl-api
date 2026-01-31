@@ -1451,6 +1451,28 @@ app.get('/teams', (req, res) => {
   });
 });
 
+app.get('/goals/:player', async (req, res) => {
+  const userid = await resolveUserId(req.params.player);
+
+  if (!userid) {
+    return res.status(404).json({ success: false, error: 'Player not found' });
+  }
+
+  const { data, error } = await supabase
+    .from('fantasy_player_stats')
+    .select('goals')
+    .eq('player_userid', parseInt(userid));
+
+  if (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+
+  const goals = data.reduce((t, r) => t + (r.goals || 0), 0);
+
+  res.json({ success: true, goals });
+});
+
+
 // Get player
 app.get('/player/:userid', async (req, res) => {
   const { data, error } = await supabase
