@@ -273,10 +273,14 @@ const commands = [
         .setDescription('The Roblox UserId or Username')
         .setRequired(true)
     ),
-
   new SlashCommandBuilder()
     .setName('goals')
-    .setDescription('Show the current amount of goals a player has')
+    .addStringOption(option =>
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
+        .setRequired(true)
+    ),
+      
   new SlashCommandBuilder()
     .setName('teams')
     .setDescription('List all valid teams and divisions'),
