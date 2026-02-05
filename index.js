@@ -1182,52 +1182,6 @@ if (commandName === 'players') {
         content: `✅ Dropped **${username}** from your team.\n💰 Refunded: **£${refundAmount}m** | New budget: **£${newBudget.toFixed(1)}m**`
       });
     }
-
-const MATCH_LOG_CHANNEL_ID = '1465447985256206409'; //
-
-// 2. This creates the "URL" that Roblox will talk to
-app.post('/matchlog', async (req, res) => {
-    try {
-        const { home, away, score, goals, loggedBy } = req.body;
-
-        // Find the Discord channel by its ID
-        const channel = await client.channels.fetch(MATCH_LOG_CHANNEL_ID);
-        
-        if (!channel) {
-            console.error("Match Log Channel not found!");
-            return res.status(404).json({ success: false, error: "Channel not found" });
-        }
-
-        // Format the goal scorers into a list for the embed
-        // We check if there are goals, otherwise say "No goals"
-        const goalList = goals && goals.length > 0 
-            ? goals.map(g => `⚽ **${g.scorer}** (Assist: ${g.assist})`).join('\n')
-            : "No goals recorded.";
-
-        // Create the message (Embed)
-        const logEmbed = new EmbedBuilder()
-            .setTitle('🏟️ Match Results')
-            .setColor(0x00FF00) // Green color
-            .addFields(
-                { name: 'Home', value: `${home}`, inline: true },
-                { name: 'Score', value: `**${score.home} - ${score.away}**`, inline: true },
-                { name: 'Away', value: `${away}`, inline: true },
-                { name: 'Goal History', value: goalList }
-            )
-            .setFooter({ text: `Logged by ${loggedBy}` })
-            .setTimestamp();
-
-        // Send the message to the channel
-        await channel.send({ embeds: [logEmbed] });
-
-        // Tell Roblox that it worked
-        res.json({ success: true });
-
-    } catch (error) {
-        console.error("Error receiving match log:", error);
-        res.status(500).json({ success: false, error: "Internal Server Error" });
-    }
-});
     
     ///fantasy captain
     if (subcommand === 'captain') {
@@ -1614,6 +1568,52 @@ client.login(process.env.DISCORD_TOKEN);
 // ============ EXPRESS API FOR ROBLOX ============
 const app = express();
 app.use(express.json());
+
+const MATCH_LOG_CHANNEL_ID = '1465447985256206409'; //
+
+// 2. This creates the "URL" that Roblox will talk to
+app.post('/matchlog', async (req, res) => {
+    try {
+        const { home, away, score, goals, loggedBy } = req.body;
+
+        // Find the Discord channel by its ID
+        const channel = await client.channels.fetch(MATCH_LOG_CHANNEL_ID);
+        
+        if (!channel) {
+            console.error("Match Log Channel not found!");
+            return res.status(404).json({ success: false, error: "Channel not found" });
+        }
+
+        // Format the goal scorers into a list for the embed
+        // We check if there are goals, otherwise say "No goals"
+        const goalList = goals && goals.length > 0 
+            ? goals.map(g => `⚽ **${g.scorer}** (Assist: ${g.assist})`).join('\n')
+            : "No goals recorded.";
+
+        // Create the message (Embed)
+        const logEmbed = new EmbedBuilder()
+            .setTitle('🏟️ Match Results')
+            .setColor(0x00FF00) // Green color
+            .addFields(
+                { name: 'Home', value: `${home}`, inline: true },
+                { name: 'Score', value: `**${score.home} - ${score.away}**`, inline: true },
+                { name: 'Away', value: `${away}`, inline: true },
+                { name: 'Goal History', value: goalList }
+            )
+            .setFooter({ text: `Logged by ${loggedBy}` })
+            .setTimestamp();
+
+        // Send the message to the channel
+        await channel.send({ embeds: [logEmbed] });
+
+        // Tell Roblox that it worked
+        res.json({ success: true });
+
+    } catch (error) {
+        console.error("Error receiving match log:", error);
+        res.status(500).json({ success: false, error: "Internal Server Error" });
+    }
+});
 
 // Health check
 app.get('/', (req, res) => {
