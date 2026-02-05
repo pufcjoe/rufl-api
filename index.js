@@ -225,6 +225,29 @@ const commands = [
           { name: 'Spartans', value: 'Spartans' }
         )
     ),
+
+new SlashCommandBuilder()
+  .setName('players')
+  .setDescription('List all players on a team')
+  .addStringOption(option =>
+    option.setName('team')
+      .setDescription('The team name')
+      .setRequired(true)
+      .addChoices(
+        { name: 'Seattle Sea', value: 'Seattle Sea' },
+        { name: 'Black Panthers', value: 'Black Panthers' },
+        { name: 'Phantom Town', value: 'Phantom Town' },
+        { name: 'Tix City', value: 'Tix City' },
+        { name: 'The Kingdom', value: 'The Kingdom' },
+        { name: 'Red Bandits', value: 'Red Bandits' },
+        { name: 'White Wolves', value: 'White Wolves' },
+        { name: 'Eagles', value: 'Eagles' },
+        { name: 'Galaxy United', value: 'Galaxy United' },
+        { name: 'Spartans', value: 'Spartans' },
+        { name: 'Free Agents', value: 'FreeAgent' }
+      )
+  ),
+  
   new SlashCommandBuilder()
     .setName('setdivision')
     .setDescription('Set a player\'s division')
@@ -575,6 +598,83 @@ client.on('interactionCreate', async interaction => {
     });
   }
 
+  // /players command
+if (commandName === 'players') {
+  const team = interaction.options.getString('team');
+
+  const { data: players, error } = await supabase
+    .from('players')
+    .select('*')
+    .eq('team', team)
+    .order('rating', { ascending: false });
+
+  if (error) {
+    return interaction.reply({ content: `Failed to fetch players.`, ephemeral: true });
+  }
+
+  if (!players || players.length === 0) {
+    return interaction.reply({ content: `No players found on **${team}**.`, ephemeral: true });
+  }
+
+  const division = getTeamDivision(team);
+  
+  // Group by management role
+  const owners = players.filter(p => p.management === 'TeamOwner');
+  const managers = players.filter(p => p.management === 'TeamManager');
+  const assistants = players.filter(p => p.management === 'AssistantManager');
+  const regularPlayers = players.filter(p => !p.management || p.management === 'None');
+
+  const formatPlayer = (p) => {
+    const rating = p.rating ?? 0;
+    const hof = p.hof && p.hof !== 'None' ? ` ⭐` : '';
+    const suspended = p.suspension ? ' 🚫' : '';
+    const alt = p.secondcareer ? ' 🔄' : '';
+    return `**${p.username || p.userid}** (${rating})${hof}${suspended}${alt}`;
+  };
+
+  const embed = new EmbedBuilder()
+    .setTitle(`📋 ${team}`)
+    .setDescription(`Division ${division} • ${players.length} player${players.length !== 1 ? 's' : ''}`)
+    .setColor(team === 'FreeAgent' ? 0x808080 : (division === 'A' ? 0xE63946 : 0x1D3557))
+    .setTimestamp();
+
+  if (owners.length > 0) {
+    embed.addFields({ 
+      name: '👑 Owner', 
+      value: owners.map(formatPlayer).join('\n'), 
+      inline: false 
+    });
+  }
+
+  if (managers.length > 0) {
+    embed.addFields({ 
+      name: '📋 Team Manager', 
+      value: managers.map(formatPlayer).join('\n'), 
+      inline: false 
+    });
+  }
+
+  if (assistants.length > 0) {
+    embed.addFields({ 
+      name: '📝 Assistant Manager', 
+      value: assistants.map(formatPlayer).join('\n'), 
+      inline: false 
+    });
+  }
+
+  if (regularPlayers.length > 0) {
+    embed.addFields({ 
+      name: '⚽ Players', 
+      value: regularPlayers.map(formatPlayer).join('\n'), 
+      inline: false 
+    });
+  }
+
+  embed.setFooter({ text: '⭐ = HOF • 🚫 = Suspended • 🔄 = Alt Account' });
+
+  return interaction.reply({ embeds: [embed] });
+}
+  
   // /teams command
   if (commandName === 'teams') {
     const embed = new EmbedBuilder()
