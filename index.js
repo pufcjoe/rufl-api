@@ -664,6 +664,28 @@ if (commandName === 'players') {
 
     return interaction.reply({ content: `⚽ **${data.username}** has scored **${data.goals || 0}** goals!` });
 }
+
+  // /assists commmand
+  if (commandName === 'assists') {
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+        return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const { data, error } = await supabase
+      .from('players')
+      .select('assists, username')
+      .eq('userid', userid)
+      .maybeSingle();
+
+    if (error || !data) {
+      return interaction.reply({ content: `Player not found in database.`, ephemeral: true });
+    }
+
+    return interaction.reply({ content: `⚽ **${data.username}** has assisted **${data.assists || 0}** goals!` });
+}
   
   // /lookup command
   if (commandName === 'lookup') {
