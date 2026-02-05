@@ -152,6 +152,15 @@ const commands = [
     .setDescription('The Roblox UserId or Username')
     .setRequired(true)
     ),
+
+  new SlashCommandBuilder()
+  .setName('assists')
+  .setDescription('The amount of assists a player has')
+  .addStringOption(option =>
+    option.setName('player')
+    .setDescription('The Roblox UserId or Username')
+    .setRequired(true)
+    ),
   
   new SlashCommandBuilder()
     .setName('setteam')
