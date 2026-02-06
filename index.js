@@ -243,6 +243,32 @@ new SlashCommandBuilder()
         .setRequired(true)
     ),
   new SlashCommandBuilder()
+    .setName('setgoals')
+    .setDescription('Set a player\'s goals')
+    .addStringOption(option =>
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
+        .setRequired(true)
+    )
+    .addIntegerOption(option =>
+      option.setName('goals')
+        .setDescription('The number of goals')
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName('setassists')
+    .setDescription('Set a player\'s assists')
+    .addStringOption(option =>
+      option.setName('player')
+        .setDescription('The Roblox UserId or Username')
+        .setRequired(true)
+    )
+    .addIntegerOption(option =>
+      option.setName('assists')
+        .setDescription('The number of assists')
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
     .setName('suspend')
     .setDescription('Suspend or unsuspend a player')
     .addStringOption(option =>
@@ -552,7 +578,7 @@ client.on('interactionCreate', async interaction => {
     member.roles.cache.has(ALLOWED_ROLE_ID);
 
   // Commands that require admin permission
-  const adminCommands = ['setteam', 'setdivision', 'setrating', 'suspend', 'sethof', 'setmanagement', 'setnationalteam', 'deleteplayer', 'setalt', 'fantasyadmin'];
+  const adminCommands = ['setteam', 'setdivision', 'setrating', 'setgoals', 'setassists', 'suspend', 'sethof', 'setmanagement', 'setnationalteam', 'deleteplayer', 'setalt', 'fantasyadmin'];
   
   if (adminCommands.includes(commandName) && !hasPermission) {
     return interaction.reply({ 
@@ -726,6 +752,8 @@ if (commandName === 'players') {
         { name: 'Division', value: data.division || 'None', inline: true },
         { name: 'National Team', value: data.nationalteam || 'None', inline: true },
         { name: 'Rating', value: String(data.rating ?? 0), inline: true },
+        { name: 'Goals', value: String(data.goals ?? 0), inline: true },
+        { name: 'Assists', value: String(data.assists ?? 0), inline: true },
         { name: 'Suspended', value: data.suspension ? 'Yes' : 'No', inline: true },
         { name: 'Semi', value: data.semi ? 'Yes' : 'No', inline: true },
         { name: 'Hall of Fame', value: data.hof || 'None', inline: true },
@@ -817,6 +845,58 @@ if (commandName === 'players') {
     }
 
     return interaction.reply({ content: `Updated ${username || userid}'s rating to **${rating}**` });
+  }
+
+  // /setgoals command
+  if (commandName === 'setgoals') {
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+      return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const username = await updateUsername(userid);
+    const goals = interaction.options.getInteger('goals');
+
+    const { data, error } = await supabase
+      .from('players')
+      .update({ goals })
+      .eq('userid', userid)
+      .select()
+      .maybeSingle();
+
+    if (error || !data) {
+      return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
+    }
+
+    return interaction.reply({ content: `Updated ${username || userid}'s goals to **${goals}**` });
+  }
+
+  // /setassists command
+  if (commandName === 'setassists') {
+    const input = interaction.options.getString('player');
+    const userid = await resolveUserId(input);
+    
+    if (!userid) {
+      return interaction.reply({ content: `Could not find Roblox user "${input}".`, ephemeral: true });
+    }
+
+    const username = await updateUsername(userid);
+    const assists = interaction.options.getInteger('assists');
+
+    const { data, error } = await supabase
+      .from('players')
+      .update({ assists })
+      .eq('userid', userid)
+      .select()
+      .maybeSingle();
+
+    if (error || !data) {
+      return interaction.reply({ content: `Failed to update player. They may not exist in the database.`, ephemeral: true });
+    }
+
+    return interaction.reply({ content: `Updated ${username || userid}'s assists to **${assists}**` });
   }
 
   // /suspend command
