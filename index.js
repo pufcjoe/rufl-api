@@ -1078,7 +1078,7 @@ if (commandName === 'players') {
         .insert({
           owner_discord_id: discordId,
           team_name: teamName,
-          budget: 90.0,
+          budget: 50.0,
           total_points: 0
         })
         .select()
