@@ -539,7 +539,7 @@ new SlashCommandBuilder()
         )
         .addNumberOption(opt =>
           opt.setName('amount')
-            .setDescription('Budget amount (default 90)')
+            .setDescription('Budget amount (default 50)')
             .setRequired(false)
         )
     ),
@@ -1072,7 +1072,7 @@ if (commandName === 'players') {
         return interaction.reply({ content: `You already have a fantasy team: **${existing.team_name}**`, ephemeral: true });
       }
 
-      // Create team with 90m budget
+      // Create team with 50m budget
       const { data, error } = await supabase
         .from('fantasy_teams')
         .insert({
@@ -1088,7 +1088,7 @@ if (commandName === 'players') {
         return interaction.reply({ content: `Failed to create team: ${error.message}`, ephemeral: true });
       }
 
-      return interaction.reply({ content: `✅ Fantasy team **${teamName}** created!\n💰 Budget: **£90.0m**\n\nUse \`/fantasy pick\` to add players.` });
+      return interaction.reply({ content: `✅ Fantasy team **${teamName}** created!\n💰 Budget: **£50.0m**\n\nUse \`/fantasy pick\` to add players.` });
     }
 
     // /fantasy team
@@ -1656,7 +1656,7 @@ if (commandName === 'players') {
     // /fantasyadmin resetbudget
     if (subcommand === 'resetbudget') {
       const user = interaction.options.getUser('user');
-      const amount = interaction.options.getNumber('amount') || 90.0;
+      const amount = interaction.options.getNumber('amount') || 50.0;
 
       const { data, error } = await supabase
         .from('fantasy_teams')
